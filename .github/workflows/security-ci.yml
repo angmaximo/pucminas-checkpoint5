@@ -1,0 +1,151 @@
+name: CI Security Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  lint:
+    name: Lint (Flake8)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install flake8
+
+      - name: Run Flake8
+        run: |
+          flake8 . | tee flake8-log.txt
+
+      - name: Upload Lint Logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-logs
+          path: flake8-log.txt
+
+  tests:
+    name: Testes Unitários (pytest)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Run Unit Tests
+        run: |
+          pytest -q | tee pytest-log.txt
+
+      - name: Upload Test Logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-logs
+          path: pytest-log.txt
+
+  smoke:
+    name: Smoke Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Smoke Test - Health Check
+        run: |
+          curl -I https://pucminas-upload-114476064778.us-central1.run.app | tee smoke-log.txt
+
+      - name: Upload Smoke Logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-logs
+          path: smoke-log.txt
+
+  dependency_scan:
+    name: Scan de Dependências (Safety)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install Safety
+        run: |
+          pip install safety
+          pip install -r requirements.txt
+
+      - name: Run Safety Scan
+        run: |
+          safety check --full-report | tee safety-log.txt
+
+      - name: Upload Safety Logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: safety-logs
+          path: safety-log.txt
+
+  sast:
+    name: SAST - CodeQL (Python)
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: python
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v3
+
+  dast:
+    name: DAST - OWASP ZAP Baseline
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Run OWASP ZAP Baseline Scan
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: "https://pucminas-upload-114476064778.us-central1.run.app"
+          cmd_options: "-a"
+          allow_issue_writing: false
+          artifact_name: "zap-report-internal"
+
+      - name: Upload ZAP Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zap-report
+          path: zap_report.html
