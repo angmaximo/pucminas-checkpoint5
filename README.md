@@ -16,7 +16,7 @@ google sdk
   
 1. Clone o repositório para sua máquina: 
    
-`git clone https://github.com/seu-usuario/pucminas-checkpoint5.git`    
+`git clone https://github.com/seu-usuario/pucminas-checkpoint5.git`       
   
 2. Entre na pasta do projeto  
   
